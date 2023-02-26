@@ -47,7 +47,7 @@ func (r *renamer) rename() {
 	filepath.Walk(r.src, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
 			suffix := strings.ToLower(filepath.Ext(path))
-			if suffix == ".jpg" || suffix == ".heic" {
+			if suffix == ".jpg" || suffix == ".heic" || suffix == ".cr2" {
 				t, e := getDate(path)
 				if e != nil {
 					color.Red("Error getting date from %s: %v\n", path, e)
