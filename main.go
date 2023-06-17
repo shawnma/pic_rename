@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"io/fs"
 	"log"
@@ -47,10 +46,10 @@ func (r *renamer) rename() {
 	filepath.Walk(r.src, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
 			suffix := strings.ToLower(filepath.Ext(path))
-			if suffix == ".jpg" || suffix == ".heic" || suffix == ".cr2" {
+			if suffix == ".jpg" || suffix == ".heic" || suffix == ".cr2" || suffix == ".jpeg" {
 				t, e := getDate(path)
-				if e != nil {
-					color.Red("Error getting date from %s: %v\n", path, e)
+				if e != nil || t.Second() == 0 {
+					color.Red("Error getting date from %s: %v, t=%q\n", path, e, t)
 				} else {
 					dest := r.getDest(t, suffix)
 					e = os.Rename(path, dest)
@@ -88,19 +87,9 @@ func getDate(path string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	defer f.Close()
-	m, err := imagemeta.Parse(f)
+	e, err := imagemeta.Decode(f)
 	if err != nil {
 		return time.Time{}, err
 	}
-	if m == nil {
-		return time.Time{}, errors.New("parse succeeded, but no metadata found")
-	}
-	e, err := m.Exif()
-	if err != nil {
-		return time.Time{}, err
-	}
-	if e == nil {
-		return time.Time{}, errors.New("no exif data found")
-	}
-	return e.DateTime(time.Local)
+	return e.CreateDate(), nil
 }
