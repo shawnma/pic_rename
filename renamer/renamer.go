@@ -1,7 +1,7 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	flag "github.com/spf13/pflag"
+
 	"github.com/evanoberholster/imagemeta"
 	"github.com/fatih/color"
 )
@@ -17,8 +19,13 @@ import (
 func main() {
 	monthOnly := flag.Bool("m", false, "use month in path only")
 	dest := flag.String("dest", "output", "Destination dir")
-	src := flag.String("src", ".", "source dir")
+	src := flag.String("src", "", "source dir")
 	flag.Parse()
+	if src == nil || *src == "" {
+		fmt.Printf("%s: required --src\n", os.Args[0])
+		flag.PrintDefaults()
+		return
+	}
 	r := renamer{
 		dirsCache: make(map[string]bool),
 		monthOnly: *monthOnly,
