@@ -17,9 +17,9 @@ import (
 )
 
 func main() {
-	monthOnly := flag.Bool("m", false, "use month in path only")
-	dest := flag.String("dest", "output", "Destination dir")
-	src := flag.String("src", "", "source dir")
+	monthOnly := flag.BoolP("month-only", "m", false, "use month in path only")
+	dest := flag.StringP("dest", "d", "output", "Destination dir")
+	src := flag.StringP("src", "s", "", "source dir")
 	flag.Parse()
 	if src == nil || *src == "" {
 		fmt.Printf("%s: required --src\n", os.Args[0])
@@ -59,6 +59,10 @@ func (r *renamer) rename() {
 					color.Red("Error getting date from %s: %v, t=%q\n", path, e, t)
 				} else {
 					dest := r.getDest(t, suffix)
+					if _, err := os.Stat(dest); err == nil {
+						color.HiRed("File %s already exists", dest)
+						return nil
+					}
 					e = os.Rename(path, dest)
 					if e != nil {
 						color.Red("Failed to rename %s->%s: %s", path, dest, e)
