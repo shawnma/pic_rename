@@ -17,10 +17,15 @@ import (
 var logger = log.New()
 
 func UpdateIndex(dbPath string, dir string) error {
-	db, err := NewHash(dbPath)
+	absDb, err := filepath.Abs(dbPath)
 	if err != nil {
 		return err
 	}
+	db, err := NewHash(absDb)
+	if err != nil {
+		return err
+	}
+	logger.Info("Opened DB at %s", absDb)
 	defer db.Close()
 	filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
@@ -31,25 +36,28 @@ func UpdateIndex(dbPath string, dir string) error {
 					logger.Error("Hash file failed: %w", err)
 					return err
 				}
+				absPath, _ := filepath.Abs(path)
+				relPath, _ := filepath.Rel(absDb, absPath)
 				existing, err := db.GetName(h)
 				if err != nil {
 					logger.Warn("Read failed: %w", err)
 				} else if existing == "" {
-					logger.Debug("No existing row, inserting (%s, %s)", path, h)
-					err = db.Insert(path, h)
+					logger.Debug("No existing row, inserting (%s, %s)", relPath, h)
+					err = db.Insert(relPath, h)
 					if err != nil {
 						logger.Warn("insert failed: %w", err)
 					}
 				} else {
-					_, err = os.Stat(existing)
+
+					_, err = os.Stat(filepath.Join(absDb, existing))
 					if os.IsNotExist(err) {
-						logger.Debug("Found existing path %s with same hash (%s, %s), existing file moved, updating...", existing, path, h)
-						err := db.UpdatePath(path, h)
+						logger.Debug("Found existing path %s with same hash (%s, %s), existing file moved, updating...", existing, relPath, h)
+						err := db.UpdatePath(relPath, h)
 						if err != nil {
 							logger.Warn("Update failed: %w", err)
 						}
-					} else if existing != path {
-						logger.Warn("Found duplicated hash for %s and %s with hash %s", existing, path, h)
+					} else if existing != relPath {
+						logger.Warn("Found duplicated hash for %s and %s with hash %s", existing, relPath, h)
 					} // else no update
 				}
 			}
