@@ -40,6 +40,18 @@ func (i *ImageHash) GetName(h string) (string, error) {
 	return existing, err
 }
 
+func (i *ImageHash) GetHash(path string) (string, error) {
+	var existing string
+	err := i.db.QueryRow("SELECT hash from "+tableName+" where path=?", path).Scan(&existing)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		err = fmt.Errorf("read failed: %w", err)
+	}
+	return existing, err
+}
+
 func (i *ImageHash) Insert(path, hash string) error {
 	_, err := i.db.Exec("Insert into "+tableName+" values (?, ?)", path, hash)
 	if err != nil {

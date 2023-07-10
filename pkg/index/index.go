@@ -31,16 +31,24 @@ func UpdateIndex(dbPath string, dir string) error {
 		if !info.IsDir() {
 			suffix := strings.ToLower(filepath.Ext(path))
 			if suffix == ".jpg" || suffix == ".heic" || suffix == ".cr2" || suffix == ".jpeg" {
-				h, err := hashFile(path)
+				absPath, _ := filepath.Abs(path)
+				relPath, _ := filepath.Rel(absDb, absPath)
+				h, err := db.GetHash(relPath)
+				if err != nil {
+					logger.Error("Failed to get hash from db for %s", path)
+					return nil
+				}
+				if h != "" {
+					return nil // assuming everyone is fine and file is immutable.
+				}
+				h, err = hashFile(path)
 				if err != nil {
 					logger.Error("Hash file failed: %w", err)
 					return err
 				}
-				absPath, _ := filepath.Abs(path)
-				relPath, _ := filepath.Rel(absDb, absPath)
 				existing, err := db.GetName(h)
 				if err != nil {
-					logger.Warn("Read failed: %w", err)
+					logger.Warn("Read name for hash failed: %w", err)
 				} else if existing == "" {
 					logger.Debug("No existing row, inserting (%s, %s)", relPath, h)
 					err = db.Insert(relPath, h)
@@ -48,7 +56,6 @@ func UpdateIndex(dbPath string, dir string) error {
 						logger.Warn("insert failed: %w", err)
 					}
 				} else {
-
 					_, err = os.Stat(filepath.Join(absDb, existing))
 					if os.IsNotExist(err) {
 						logger.Debug("Found existing path %s with same hash (%s, %s), existing file moved, updating...", existing, relPath, h)
@@ -57,7 +64,7 @@ func UpdateIndex(dbPath string, dir string) error {
 							logger.Warn("Update failed: %w", err)
 						}
 					} else if existing != relPath {
-						logger.Warn("Found duplicated hash for %s and %s with hash %s", existing, relPath, h)
+						logger.Warn("DUP: %s - %s (%s)", existing, relPath, h)
 					} // else no update
 				}
 			}
