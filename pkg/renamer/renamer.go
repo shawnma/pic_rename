@@ -21,12 +21,15 @@ const (
 	folderMonthOnly = "2006.01"
 )
 
+var suffixes = []string{".jpg", ".jpeg", ".heic", ".cr2", ".mp4", ".mov"}
+
 var logger = log.New()
 
 type Renamer struct {
 	dirsCache map[string]bool
 	monthOnly bool
 	overwrite bool
+	dryRun    bool
 	seq       bool // whether to rename the files using a seq number if already exists
 	dest      string
 	src       string
@@ -36,6 +39,7 @@ func (r *Renamer) parseFlags() {
 	flag.BoolVarP(&r.monthOnly, "month-only", "m", false, "use month in path only")
 	flag.BoolVarP(&r.overwrite, "overwrite", "o", false, "overwrite the file if the file exists")
 	flag.BoolVarP(&r.seq, "seq", "q", false, "if the dest exits, using a seq number suffix")
+	flag.BoolVar(&r.dryRun, "dry-run", false, "dry run only")
 
 	flag.StringVarP(&r.dest, "dest", "d", "output", "destination dir")
 	flag.StringVarP(&r.src, "src", "s", "", "source dir")
@@ -49,11 +53,16 @@ func (r *Renamer) Rename() {
 		flag.PrintDefaults()
 		return
 	}
-	logger.Info("Renaming pictures, src=%s, dest=%s, month only=%v\n", r.src, r.dest, r.monthOnly)
+	logger.Info("Renaming pictures, src=%s, dest=%s, month only=%v dry run=%v override=%v seq=%v\n",
+		r.src, r.dest, r.monthOnly, r.dryRun, r.overwrite, r.seq)
+	suffixSet := map[string]bool{}
+	for _, s := range suffixes {
+		suffixSet[s] = true
+	}
 	filepath.Walk(r.src, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
 			suffix := strings.ToLower(filepath.Ext(path))
-			if suffix == ".jpg" || suffix == ".heic" || suffix == ".cr2" || suffix == ".jpeg" {
+			if _, ok := suffixSet[suffix]; ok {
 				r.renameOne(path, suffix)
 			}
 		}
@@ -81,6 +90,10 @@ func (r *Renamer) renameOne(path string, suffix string) {
 				return
 			}
 		}
+		if r.dryRun {
+			logger.Info("Dry run: mv %s %s", path, dest)
+			return
+		}
 		e = os.Rename(path, dest)
 		if e != nil {
 			logger.Error("Failed to rename %s->%s: %s", path, dest, e)
@@ -99,7 +112,7 @@ func (r *Renamer) getDest(t time.Time, suffix string, seq int) string {
 		folder = t.Format(folderFomrat)
 	}
 	destDir := path.Join(r.dest, folder)
-	if _, ok := r.dirsCache[destDir]; !ok {
+	if _, ok := r.dirsCache[destDir]; !ok && !r.dryRun {
 		os.MkdirAll(destDir, 0700)
 		r.dirsCache[destDir] = true
 	}
