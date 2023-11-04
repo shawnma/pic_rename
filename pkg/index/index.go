@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"shawnma.com/pic_rename/pkg/log"
 )
@@ -27,12 +28,14 @@ func UpdateIndex(dbPath string, dir string) error {
 	}
 	logger.Info("Opened DB at %s", absDb)
 	defer db.Close()
+	count := 1
 	filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
 			suffix := strings.ToLower(filepath.Ext(path))
 			if suffix == ".jpg" || suffix == ".heic" || suffix == ".cr2" || suffix == ".jpeg" {
 				absPath, _ := filepath.Abs(path)
 				relPath, _ := filepath.Rel(absDb, absPath)
+				relPath = strings.ToLower(relPath)
 				h, err := db.GetHash(relPath)
 				if err != nil {
 					logger.Error("Failed to get hash from db for %s", path)
@@ -47,6 +50,7 @@ func UpdateIndex(dbPath string, dir string) error {
 					return err
 				}
 				existing, err := db.GetName(h)
+				existing = strings.ToLower(existing)
 				if err != nil {
 					logger.Warn("Read name for hash failed: %w", err)
 				} else if existing == "" {
@@ -63,9 +67,13 @@ func UpdateIndex(dbPath string, dir string) error {
 						if err != nil {
 							logger.Warn("Update failed: %w", err)
 						}
-					} else if existing != relPath {
+					} else if existing != relPath && unicode.IsDigit([]rune(relPath)[0]) && unicode.IsDigit([]rune(existing)[0]) {
 						logger.Warn("DUP: %s - %s (%s)", existing, relPath, h)
 					} // else no update
+				}
+				count += 1
+				if count%100 == 0 {
+					logger.Error("%d - %s", count, path)
 				}
 			}
 		}
@@ -79,6 +87,7 @@ func hashFile(f string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer handle.Close()
 	hash := crypto.MD5.New()
 
 	bs := make([]byte, 1024)
