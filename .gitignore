@@ -1,3 +1,5 @@
 cmd/renamer/renamer
 cmd/indexer/indexer
+indexer
+renamer
 .vscode

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	dbName    = "image_hash.sqlite3"
+	dbName    = "hash.sqlite3"
 	tableName = "ImageHash"
 )
 
