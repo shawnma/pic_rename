@@ -2,8 +2,8 @@ package renamer
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
-
 	"os"
 	"path"
 	"path/filepath"
@@ -17,8 +17,8 @@ import (
 
 const (
 	nameFormat      = "20060102_150405"
-	folderFomrat    = "2006.01.02"
-	folderMonthOnly = "2006.01"
+	folderFomrat    = "06/2006.01.02"
+	folderMonthOnly = "06/2006.01"
 )
 
 var suffixes = []string{".jpg", ".jpeg", ".heic", ".cr2", ".mp4", ".mov"}
@@ -96,12 +96,43 @@ func (r *Renamer) renameOne(path string, suffix string) {
 		}
 		e = os.Rename(path, dest)
 		if e != nil {
-			logger.Error("Failed to rename %s->%s: %s", path, dest, e)
+			ex := copy(path, dest)
+			if ex != nil {
+				logger.Error("Failed to rename and copy %s->%s: %s; %s", path, dest, e, ex)
+			} else {
+				os.Remove(path)
+				logger.Debug("Success: %s->%s", path, dest)
+			}
 		} else {
 			logger.Debug("Success: %s->%s", path, dest)
 		}
 		return
 	}
+}
+
+func copy(src, dst string) error {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if !sourceFileStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+	_, err = io.Copy(destination, source)
+	return err
 }
 
 func (r *Renamer) getDest(t time.Time, suffix string, seq int) string {
