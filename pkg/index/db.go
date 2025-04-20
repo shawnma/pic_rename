@@ -72,13 +72,16 @@ func (i *ImageHash) Close() error {
 func openOrCreate(dbPath string) (*sql.DB, error) {
 	dbf := path.Join(dbPath, dbName)
 	db, err := sql.Open("sqlite3", dbf)
-	if err == nil {
-		err = initDB(db)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create sqlite file: %w", err)
-		}
+	if err != nil {
+		return nil, fmt.Errorf("unable to open database: %w", err)
 	}
-	return db, err
+
+	err = initDB(db)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("unable to initialize database: %w", err)
+	}
+	return db, nil
 }
 
 func initDB(db *sql.DB) error {
