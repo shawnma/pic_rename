@@ -31,18 +31,30 @@ func isVideo(f string) bool {
 	return slices.Contains(videosSuffix, f)
 }
 
-func UpdateIndex(dbPath string, dir string) error {
+// Duplicate represents a set of files that have been duplicated from one folder to another
+type Duplicate struct {
+	OriginalFolder string
+	NewFolder      string
+	OriginalFiles  []string
+	NewFiles       []string
+}
+
+func UpdateIndex(dbPath string, dir string) ([]Duplicate, error) {
 	absDb, err := filepath.Abs(dbPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	db, err := NewHash(absDb)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	logger.Info("Opened DB at %s", absDb)
 	defer db.Close()
 	count := 1
+
+	// Map to store duplicates by folder pairs
+	folderPairsToDuplicates := make(map[string]*Duplicate)
+
 	filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
 			path = strings.ToLower(path)
@@ -83,6 +95,31 @@ func UpdateIndex(dbPath string, dir string) error {
 						}
 					} else if existing != relPath {
 						logger.Warn("DUP: %s - %s (%s)", existing, relPath, h)
+						// Get the directories of both files
+						dir1 := filepath.Dir(existing)
+						dir2 := filepath.Dir(relPath)
+
+						// Create a unique key for this folder pair
+						var key string
+						if dir1 < dir2 {
+							key = dir1 + "|" + dir2
+						} else {
+							key = dir2 + "|" + dir1
+						}
+
+						// Get or create the Duplicate entry for this folder pair
+						dup, exists := folderPairsToDuplicates[key]
+						if !exists {
+							dup = &Duplicate{
+								OriginalFolder: dir1,
+								NewFolder:      dir2,
+							}
+							folderPairsToDuplicates[key] = dup
+						}
+
+						// Add the files to their respective folders
+						dup.OriginalFiles = append(dup.OriginalFiles, existing)
+						dup.NewFiles = append(dup.NewFiles, relPath)
 					} // else no update
 				}
 				count += 1
@@ -93,7 +130,14 @@ func UpdateIndex(dbPath string, dir string) error {
 		}
 		return nil
 	})
-	return nil
+
+	// Convert the map to a slice of Duplicates
+	var duplicates []Duplicate
+	for _, dup := range folderPairsToDuplicates {
+		duplicates = append(duplicates, *dup)
+	}
+
+	return duplicates, nil
 }
 
 func hashFile(f string) (string, error) {
