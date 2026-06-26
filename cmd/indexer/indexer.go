@@ -29,8 +29,9 @@ func main() {
 		panic(err)
 	}
 
-	for _, dup := range duplicates {
-		fmt.Println("\n=== Duplicate Found ===")
+	total := len(duplicates)
+	for i, dup := range duplicates {
+		fmt.Printf("\n=== Duplicate %d of %d ===\n", i+1, total)
 		fmt.Println("Original Location:")
 		fmt.Printf("  Folder: %s\n", dup.OriginalFolder)
 		fmt.Println("  Files:")
@@ -45,7 +46,7 @@ func main() {
 		}
 		fmt.Println("=====================")
 
-		if deleteFlag {
+		if deleteFlag && dup.OriginalFolder[0] != '#' {
 			fmt.Println("\nOptions:")
 			fmt.Println("o - Delete original files")
 			fmt.Println("n - Delete new files")
